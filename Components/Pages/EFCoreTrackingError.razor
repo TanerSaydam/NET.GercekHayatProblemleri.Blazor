@@ -113,7 +113,7 @@
 
 	public async Task GetAllShoppingCarts()
 	{
-		carts = await shoppingCartRepository.GetAll().Include(i => i.Product).ToListAsync();
+		carts = await shoppingCartRepository.GetAllWithTracking().Include(i => i.Product).ToListAsync();
 	}
 
 	public async Task GetAllProducts()
@@ -127,7 +127,7 @@
 		{
 			foreach (var cart in carts)
 			{
-				var product = await productRepository.FirstOrDefaultAsync(p => p.Id == cart.ProductId);
+				var product = await productRepository.Where(p => p.Id == cart.ProductId).FirstAsync();
 				product.Stock -= cart.Quantity;
 				productRepository.Update(product);
 
@@ -165,17 +165,17 @@
 		for (int i = 0; i < 2; i++)
 		{
 			ShoppingCart shoppingCart1 = new()
-				{
-					ProductId = products[i].Id,
-					Quantity = new Random().Next(1, 50)
-				};
+			{
+				ProductId = products[i].Id,
+				Quantity = new Random().Next(1, 50)
+			};
 			shoppingCarts.Add(shoppingCart1);
 
 			ShoppingCart shoppingCart2 = new()
-				{
-					ProductId = products[i].Id,
-					Quantity = new Random().Next(1, 50)
-				};
+			{
+				ProductId = products[i].Id,
+				Quantity = new Random().Next(1, 50)
+			};
 			shoppingCarts.Add(shoppingCart2);
 		}
 
