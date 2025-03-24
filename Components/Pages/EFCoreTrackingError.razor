@@ -1,0 +1,173 @@
+﻿@page "/ef-core-tracking-error"
+@using Microsoft.EntityFrameworkCore
+@using NET.GercekHayatProblemleri.Blazor.Context
+@using NET.GercekHayatProblemleri.Blazor.Models
+@inject ApplicationDbContext dbContext
+@rendermode InteractiveServer
+
+<h3>EF Core Tracking Error</h3>
+<p><b>Sipariş Oluştur</b> butonuna bastığınızda sepetteki her bir ürünün sepetteki adedi kadar stok rakamından düşüp sonra sepeti boşaltması gerekiyor. Ama Aynı üründen 2 tane ekli ise ki örnek listede öyle, o zaman tracking hatası veriyor. </p>
+<p>Aşağıdaki soruların cevaplarını LinkedIn hesabınızdan beni de etiketleyerek paylaşabilirsiniz. İyi çalışmalar. Taner Saydam 🤗</p>
+<ul>
+	<li>Hatanın nedeni ne?</li>
+	<li>Böyle bir sorunu hangi yöntemler ile çözebiliriz?</li>
+</ul>
+<p><b>Sipariş Oluştur</b> ile hatayı görebilirsiniz. Eğer sorunu çözerseniz sepetteki ürünleri tekrar getirmek için <b>Sepete Tekrar Ürün Ekle</b> butonuna basabilirsiniz.</p>
+
+@if(error is not null)
+{
+	<div class="alert alert-danger mt-1">
+		<button type="button" class="btn-close" @onclick="CloseError" aria-label="Close"></button>
+		<span>Error: @error</span>
+	</div>	
+	<div class="alert alert-warning mt-2">
+		<span>Stack Tacke: @stackTrace</span>
+	</div>
+}
+
+<div class="row mt-1">
+	<div class="col-6">
+		<h4>Sepetim</h4>
+		<div class="text-start mt-1">
+			<button class="btn btn-danger btn-sm" @onclick="ResetShoppingCart">Sepeti Sıfırla</button>
+		</div>
+		<table class="table table-bordered mt-1">
+			<thead>
+				<tr>
+					<th>#</th>
+					<th>Ürün Adı</th>
+					<th>Adet</th>
+					<th>Birim Fiyatı</th>
+					<th>Toplam</th>
+				</tr>
+			</thead>
+			<tbody>
+				@{
+					var index = 1;
+				}
+				@foreach (var item in carts)
+				{
+					<tr>
+						<td>@index</td>
+						<td>@item.Product!.Name</td>
+						<td>@item.Quantity</td>
+						<td>@item.Product.Price.ToString("C")</td>
+						<td>@((item.Quantity * item.Product.Price).ToString("C"))</td>
+					</tr>
+					index++;
+				}
+			</tbody>
+		</table>
+		<hr />
+		<div class="text-center">
+			<button class="btn btn-primary" @onclick="CreateOrder">Sipariş Oluştur</button>
+		</div>		
+	</div>
+	<div class="col-6">
+		<h4>Stok Listesi</h4>
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>#</th>
+					<th>Stok Adı</th>
+					<th>Stok Adedi</th>
+					<th>Birim Fiyatı</th>
+				</tr>
+			</thead>
+			<tbody>
+				@{
+					index = 1;
+				}
+				@foreach (var item in products)
+				{
+					<tr>
+						<td>@index</td>
+						<td>@item.Name</td>
+						<td>@item.Stock</td>
+						<td>@item.Price.ToString("C")</td>
+					</tr>
+					index++;
+				}
+			</tbody>
+		</table>
+	</div>
+</div>
+
+
+@code {
+	List<ShoppingCart> carts = new();
+	List<Product> products = new();
+	string? error;
+	string? stackTrace;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await GetAllShoppingCarts();
+		await GetAllProducts();
+	}
+
+	public async Task GetAllShoppingCarts()
+	{
+		carts = await dbContext.ShoppingCarts.Include(i => i.Product).ToListAsync();
+	}
+
+	public async Task GetAllProducts()
+	{
+		products = await dbContext.Products.ToListAsync();
+	}
+
+	public async Task CreateOrder()
+	{
+		try
+		{
+			foreach (var cart in carts)
+			{
+				var product = await dbContext.Products.AsNoTracking().FirstAsync(p => p.Id == cart.ProductId);
+				product.Stock -= cart.Quantity;
+				dbContext.Update(product);
+			}
+
+			dbContext.RemoveRange(carts);
+			await dbContext.SaveChangesAsync();
+			await GetAllShoppingCarts();
+			await GetAllProducts();
+		}
+		catch (Exception ex)
+		{
+			error = ex.Message;
+			stackTrace = ex.StackTrace;
+		}
+	}
+
+	public void CloseError()
+	{
+		error = null;
+	}
+
+	public async Task ResetShoppingCart()
+	{
+		dbContext.RemoveRange(carts);
+
+		List<ShoppingCart> shoppingCarts = new();
+		for (int i = 0; i < 2; i++)
+		{
+			ShoppingCart shoppingCart1 = new()
+				{
+					ProductId = products[i].Id,
+					Quantity = new Random().Next(1, 50)
+				};
+			shoppingCarts.Add(shoppingCart1);
+
+			ShoppingCart shoppingCart2 = new()
+				{
+					ProductId = products[i].Id,
+					Quantity = new Random().Next(1, 50)
+				};
+			shoppingCarts.Add(shoppingCart2);
+		}
+		
+		dbContext.AddRange(shoppingCarts);
+		dbContext.SaveChanges();
+		await GetAllShoppingCarts();
+	}
+}
