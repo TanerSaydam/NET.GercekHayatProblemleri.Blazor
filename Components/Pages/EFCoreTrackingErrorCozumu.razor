@@ -1,4 +1,4 @@
-﻿@page "/ef-core-tracking-error"
+﻿@page "/ef-core-tracking-error-cozumu"
 @using Microsoft.EntityFrameworkCore
 @using NET.GercekHayatProblemleri.Blazor.Models
 @using NET.GercekHayatProblemleri.Blazor.Repositories
@@ -125,11 +125,13 @@
 	{
 		try
 		{
+			var productIds = carts.Select(s => s.ProductId).Distinct().ToList();
+			var products = await productRepository.WhereWithTracking(p => productIds.Contains(p.Id)).ToListAsync();
+			
 			foreach (var cart in carts)
 			{
-				var product = await productRepository.Where(p => p.Id == cart.ProductId).FirstAsync();
-				product.Stock -= cart.Quantity;
-				productRepository.Update(product);
+				var product = products.Where(p => p.Id == cart.ProductId).First();				
+				product.Stock -= cart.Quantity;				
 
 				var order = new Order()
 				{
