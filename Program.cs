@@ -1,8 +1,10 @@
 using Bogus;
+using GenericRepository;
 using Microsoft.EntityFrameworkCore;
 using NET.GercekHayatProblemleri.Blazor.Components;
 using NET.GercekHayatProblemleri.Blazor.Context;
 using NET.GercekHayatProblemleri.Blazor.Models;
+using NET.GercekHayatProblemleri.Blazor.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,13 +18,12 @@ builder.Services.AddHttpClient();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-var app = builder.Build();
+builder.Services.AddScoped<IUnitOfWork>(srv => srv.GetRequiredService<ApplicationDbContext>());
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IShoppingCartRepository, ShoppingCartRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-}
+var app = builder.Build();
 
 app.UseHttpsRedirection();
 

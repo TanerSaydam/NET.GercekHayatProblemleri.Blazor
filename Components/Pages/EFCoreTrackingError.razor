@@ -1,25 +1,30 @@
 ﻿@page "/ef-core-tracking-error"
 @using Microsoft.EntityFrameworkCore
-@using NET.GercekHayatProblemleri.Blazor.Context
 @using NET.GercekHayatProblemleri.Blazor.Models
-@inject ApplicationDbContext dbContext
+@using NET.GercekHayatProblemleri.Blazor.Repositories
+@using GenericRepository
+@inject IProductRepository productRepository
+@inject IShoppingCartRepository shoppingCartRepository
+@inject IOrderRepository orderRepository
+@inject IUnitOfWork unitOfWork
 @rendermode InteractiveServer
 
 <h3>EF Core Tracking Error</h3>
 <p><b>Sipariş Oluştur</b> butonuna bastığınızda sepetteki her bir ürünün sepetteki adedi kadar stok rakamından düşüp sonra sepeti boşaltması gerekiyor. Ama Aynı üründen 2 tane ekli ise ki örnek listede öyle, o zaman tracking hatası veriyor. </p>
 <p>Aşağıdaki soruların cevaplarını LinkedIn hesabınızdan beni de etiketleyerek paylaşabilirsiniz. İyi çalışmalar. Taner Saydam 🤗</p>
+<p class="alert alert-warning">Not: Sorunu çözdüğünüzde sipari oluşturma sonrası Stok Listesindeki ilgili stokların stok adetleri değişmeli</p>
 <ul>
 	<li>Hatanın nedeni ne?</li>
 	<li>Böyle bir sorunu hangi yöntemler ile çözebiliriz?</li>
 </ul>
 <p><b>Sipariş Oluştur</b> ile hatayı görebilirsiniz. Eğer sorunu çözerseniz sepetteki ürünleri tekrar getirmek için <b>Sepete Tekrar Ürün Ekle</b> butonuna basabilirsiniz.</p>
-
-@if(error is not null)
+<hr />
+@if (error is not null)
 {
 	<div class="alert alert-danger mt-1">
 		<button type="button" class="btn-close" @onclick="CloseError" aria-label="Close"></button>
 		<span>Error: @error</span>
-	</div>	
+	</div>
 	<div class="alert alert-warning mt-2">
 		<span>Stack Tacke: @stackTrace</span>
 	</div>
@@ -61,7 +66,7 @@
 		<hr />
 		<div class="text-center">
 			<button class="btn btn-primary" @onclick="CreateOrder">Sipariş Oluştur</button>
-		</div>		
+		</div>
 	</div>
 	<div class="col-6">
 		<h4>Stok Listesi</h4>
@@ -108,12 +113,12 @@
 
 	public async Task GetAllShoppingCarts()
 	{
-		carts = await dbContext.ShoppingCarts.Include(i => i.Product).ToListAsync();
+		carts = await shoppingCartRepository.GetAll().Include(i => i.Product).ToListAsync();
 	}
 
 	public async Task GetAllProducts()
 	{
-		products = await dbContext.Products.ToListAsync();
+		products = await productRepository.GetAll().ToListAsync();
 	}
 
 	public async Task CreateOrder()
@@ -122,13 +127,21 @@
 		{
 			foreach (var cart in carts)
 			{
-				var product = await dbContext.Products.AsNoTracking().FirstAsync(p => p.Id == cart.ProductId);
+				var product = await productRepository.FirstOrDefaultAsync(p => p.Id == cart.ProductId);
 				product.Stock -= cart.Quantity;
-				dbContext.Update(product);
+				productRepository.Update(product);
+
+				var order = new Order()
+				{
+					ProductId = cart.ProductId,
+					Price = cart.Product!.Price,
+					Quantity = cart.Quantity
+				};
+				orderRepository.Add(order);
 			}
 
-			dbContext.RemoveRange(carts);
-			await dbContext.SaveChangesAsync();
+			shoppingCartRepository.DeleteRange(carts);
+			await unitOfWork.SaveChangesAsync();
 			await GetAllShoppingCarts();
 			await GetAllProducts();
 		}
@@ -146,7 +159,7 @@
 
 	public async Task ResetShoppingCart()
 	{
-		dbContext.RemoveRange(carts);
+		shoppingCartRepository.DeleteRange(carts);
 
 		List<ShoppingCart> shoppingCarts = new();
 		for (int i = 0; i < 2; i++)
@@ -165,9 +178,9 @@
 				};
 			shoppingCarts.Add(shoppingCart2);
 		}
-		
-		dbContext.AddRange(shoppingCarts);
-		dbContext.SaveChanges();
+
+		shoppingCartRepository.AddRange(shoppingCarts);
+		unitOfWork.SaveChanges();
 		await GetAllShoppingCarts();
 	}
 }
