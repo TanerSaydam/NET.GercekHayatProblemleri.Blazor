@@ -4,7 +4,7 @@ public sealed class ShoppingCart
 {
     public ShoppingCart()
     {
-        Id = Guid.CreateVersion7();
+        Id = Guid.NewGuid();
     }
 
     public Guid Id { get; set; }
